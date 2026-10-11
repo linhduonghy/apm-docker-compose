@@ -1,0 +1,42 @@
+groups:
+- name: node_exporter_alerts
+  rules:
+    # 1. Host Down
+    - alert: HostInstanceDown
+      expr: up{job="node-exporter"} == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Instance {{ $labels.instance }} down"
+        description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 2 minutes."
+
+
+    # 2. High CPU Usage
+    - alert: HostHighCpuLoad
+      expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{job="node-exporter", mode="idle"}[5m])) * 100) > 80
+      for: 3m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU load on {{ $labels.instance }}"
+        description: "CPU usage is at {{ printf \"%.2f\" $value }}% for the last 5 minutes."
+
+    # 3. High Memory Usage
+    - alert: HostOutMapOfMemory
+      expr: (1 - (node_memory_MemAvailable_bytes{job="node-exporter"} / node_memory_MemTotal_bytes{job="node-exporter"})) * 100 > 80
+      for: 3m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Low memory on {{ $labels.instance }}"
+        description: "Memory usage has exceeded 80% (Current: {{ printf \"%.2f\" $value }}%)."
+    # 4. Low Disk Space
+    - alert: HostDiskSpaceRunningOut
+      expr: (1 - node_filesystem_free_bytes{job="node-exporter", mountpoint="/"} / node_filesystem_size_bytes{job="node-exporter", mountpoint="/"}) * 100 > 80
+      for: 3m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Disk space low on {{ $labels.instance }}"
+        description: "Root partition disk usage is over 80% (Current: {{ printf \"%.2f\" $value }}%)."

@@ -1,0 +1,32 @@
+groups:
+  - name: cadvisor_container_alerts
+    rules:
+      # 1. Container Down
+      - alert: ContainerAbsent
+        expr: time() - container_last_seen{container_label_com_docker_compose_project=~"app-deployment|app", name!=""} > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} is down"
+          description: "Container {{ $labels.name }} has been missing for more than 1 minute."
+
+      # 2. Container High Memory
+      - alert: ContainerMemoryUsageHigh
+        expr: (container_memory_working_set_bytes{container_label_com_docker_compose_project=~"app-deployment|app", name!=""} / container_spec_memory_limit_bytes{container_label_com_docker_compose_project=~"app-deployment|app", name!=""}) * 100 > 80
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} high memory usage"
+          description: "Memory usage has exceeded 80% (Current: {{ printf \"%.2f\" $value }}%)."
+
+      # 3. Container High CPU Usage
+      - alert: ContainerCpuThrottling
+        expr: (sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_project=~"app-deployment|app", name!=""}[5m])) by (name, instance) / sum(container_spec_cpu_quota{name!="", container_label_com_docker_compose_project=~"app-deployment|app"} / container_spec_cpu_period{name!="", container_label_com_docker_compose_project=~"app-deployment|app"}) by (name, instance)) * 100 > 80
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} high CPU usage"
+          description: "CPU usage has exceeded 80% (Current: {{ printf \"%.2f\" $value }}%)."

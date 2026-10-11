@@ -1,0 +1,63 @@
+extensions:
+  basicauth/server:
+    htpasswd:
+      file: /etc/otelcol-contrib/.htpasswd
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        auth:
+          authenticator: basicauth/server
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: basicauth/server
+
+exporters:
+  otlphttp/loki:
+    endpoint: http://loki-write:3100/otlp
+    tls:
+      insecure: true
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+  debug:
+    verbosity: detailed
+
+processors:
+  batch:
+    send_batch_size: 512
+    send_batch_max_size: 1024
+    timeout: 5s    
+  transform:
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["trace_id"], trace_id.string) where trace_id.string != "00000000000000000000000000000000"
+          # - set(attributes["span_id"], span_id.string) where span_id.string != "0000000000000000"
+          # - 'set(body, Concat(["[", attributes["trace_id"], " / ", attributes["span_id"], "] - ",body], "")) where attributes["trace_id"] != nil'
+          - 'set(body, Concat([attributes["trace_id"], body], " - ")) where attributes["trace_id"] != nil'
+          - 'set(body, Concat([instrumentation_scope.name, body], " - ")) where instrumentation_scope.name != nil'
+          - 'set(body, Concat([severity_text, body], " "))'
+          - 'set(body, Concat(["[", attributes["thread.name"], "] ", body], "")) where attributes["thread.name"] != nil'
+
+service:
+  extensions: [basicauth/server]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [transform, batch]
+      exporters: [otlphttp/loki]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]

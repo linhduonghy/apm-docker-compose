@@ -1,0 +1,17 @@
+apiVersion: 1
+datasources:
+  - access: proxy
+    basicAuth: true
+    basicAuthUser: $LOKI_DATASOURCE_AUTH_USER
+    jsonData:
+      httpHeaderName1: "X-Scope-OrgID"
+    secureJsonData:
+      httpHeaderValue1: "docker"
+      basicAuthPassword: ${LOKI_DATASOURCE_AUTH_PASS}
+    editable: true
+    isDefault: true
+    name: loki
+    type: loki
+    uid: loki
+    url: http://loki-gateway
+    version: 1
